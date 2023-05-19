@@ -1,8 +1,8 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-tokenizer = AutoTokenizer.from_pretrained("rinna/japanese-gpt-1b", use_fast=False)
-model = AutoModelForCausalLM.from_pretrained("rinna/japanese-gpt-1b")
+tokenizer = AutoTokenizer.from_pretrained("rinna/japanese-gpt2-medium", use_fast=False)
+model = AutoModelForCausalLM.from_pretrained("rinna/japanese-gpt2-medium")
 
 def chatbot_response(input_text):
     # ユーザーからの入力をエンコード
