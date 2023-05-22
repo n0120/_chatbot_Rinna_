@@ -1,36 +1,65 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-tokenizer = AutoTokenizer.from_pretrained("rinna/japanese-gpt2-medium", use_fast=False)
-model = AutoModelForCausalLM.from_pretrained("rinna/japanese-gpt2-medium")
+tokenizer = AutoTokenizer.from_pretrained("rinna/japanese-gpt-neox-3.6b-instruction-sft", use_fast=False)
+model = AutoModelForCausalLM.from_pretrained("rinna/japanese-gpt-neox-3.6b-instruction-sft")
 
-def chatbot_response(input_text):
-    # ユーザーからの入力をエンコード
-    input_ids = tokenizer.encode(input_text, return_tensors='pt')
-    
-    # モデルによるテキスト生成
-    with torch.no_grad():
-        output_ids = model.generate(
-            input_ids,
-            max_length=100,
-            min_length=20,
-            do_sample=True,
-            top_k=50,
-            top_p=0.95,
-            pad_token_id=tokenizer.pad_token_id,
-            bos_token_id=tokenizer.bos_token_id,
-            eos_token_id=tokenizer.eos_token_id,
-            bad_words_ids=[[tokenizer.unk_token_id]]
-        )
-    
-    # 生成されたテキストをデコード
-    output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+if torch.cuda.is_available():
+    # model = model.to("cuda")
+    model = model.to("cpu")
 
-    return output_text
+# 初期の会話プロンプト
+conversation = [
+    {
+        "speaker": "システム",
+        "text": "こんにちは、何をお手伝いできますか？"
+    }
+]
 
 while True:
-    user_input = input("あなた: ")
-    if user_input.lower() == "quit":
-        break
-    response = chatbot_response(user_input)
-    print("チャットボット: ", response)
+    # ユーザーからの入力を受け取る
+    user_input = input("ユーザー: ")
+
+    # ユーザーの発話を会話に追加する
+    conversation.append({
+        "speaker": "ユーザー",
+        "text": user_input
+    })
+
+    # 入力プロンプトを作成する
+    prompt = [
+        f"{uttr['speaker']}: {uttr['text']}"
+        for uttr in conversation
+    ]
+    prompt = "<NL>".join(prompt)
+    prompt = (
+        prompt
+        + "<NL>"
+        + "システム: "
+    )
+
+    # モデルによる応答を生成する
+    token_ids = tokenizer.encode(prompt, add_special_tokens=False, return_tensors="pt")
+
+    with torch.no_grad():
+        output_ids = model.generate(
+            token_ids.to(model.device),
+            do_sample=True,
+            max_new_tokens=128,
+            temperature=0.7,
+            pad_token_id=tokenizer.pad_token_id,
+            bos_token_id=tokenizer.bos_token_id,
+            eos_token_id=tokenizer.eos_token_id
+        )
+
+    output = tokenizer.decode(output_ids.tolist()[0][token_ids.size(1):])
+    output = output.replace("<NL>", "\n")
+
+    # システムの応答を表示する
+    print("システム:", output)
+
+    # システムの応答を会話に追加する
+    conversation.append({
+        "speaker": "システム",
+        "text": output
+    })
